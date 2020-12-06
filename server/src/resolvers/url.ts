@@ -46,7 +46,7 @@ class URLResponse {
   errors?: FieldError[];
   @Field(() => URL, { nullable: true })
   url?: URL;
-  @Field(() => String)
+  @Field(() => String, { nullable: true })
   secret?: string;
 }
 
@@ -65,7 +65,19 @@ export class URLResolver {
     @Arg("options") options: URLInput,
     @Ctx() { em }: ShortyContext
   ): Promise<URLResponse> {
-    if (!options.shorthand) {
+    if (options.shorthand) {
+      // check if ID is taken
+      const [_, number] = await em.findAndCount(URL, {
+        shorthand: options.shorthand,
+      });
+      if (number > 0)
+        return {
+          errors: [
+            { field: "shorthand", message: "shorthand is already taken!" },
+          ],
+        };
+    } else {
+      // generate random id
       do {
         options.shorthand = nanoid(__idSize__);
       } while (await em.findOne(URL, { shorthand: options.shorthand }));
