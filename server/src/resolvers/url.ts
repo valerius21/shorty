@@ -23,11 +23,11 @@ class URLInput {
 }
 
 @InputType()
-class URLUpdate {
+class URLChange {
   @Field()
   shorthand: string;
-  @Field()
-  newURL: string;
+  @Field(() => String, { nullable: true })
+  newURL?: string;
   @Field()
   secret: string;
 }
@@ -128,7 +128,7 @@ export class URLResolver {
 
   @Mutation(() => URLResponse)
   async updateURL(
-    @Arg("options") options: URLUpdate,
+    @Arg("options") options: URLChange,
     @Ctx() { em }: ShortyContext
   ): Promise<URLResponse> {
     if (!options.shorthand || !options.secret) {
@@ -143,6 +143,11 @@ export class URLResolver {
         return {
           errors: [{ field: "secret", message: "no secret provided!" }],
         };
+    }
+    if (!options.newURL) {
+      return {
+        errors: [{ field: "newURL", message: "no new URL provided!" }],
+      };
     }
     const url = await em.findOne(URL, { shorthand: options.shorthand });
     if (!url) {
@@ -171,5 +176,18 @@ export class URLResolver {
       url,
       secret: newSecret,
     };
+  }
+
+  @Mutation(() => Boolean)
+  async deleteURL(
+    @Arg("options") options: URLChange,
+    @Ctx() { em }: ShortyContext
+  ): Promise<Boolean> {
+    const url = await em.findOne(URL, { shorthand: options.shorthand });
+    if (!url) return false;
+    const valid = argon2.verify(url.secret, options.secret);
+    if (!valid) return false;
+    await em.removeAndFlush(url);
+    return true;
   }
 }
