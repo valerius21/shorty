@@ -67,7 +67,7 @@ export class URLResolver {
   ): Promise<URLResponse> {
     if (options.shorthand) {
       // check if ID is taken
-      const [_, number] = await em.findAndCount(URL, {
+      const [, number] = await em.findAndCount(URL, {
         shorthand: options.shorthand,
       });
       if (number > 0)
@@ -156,12 +156,15 @@ export class URLResolver {
           errors: [{ field: "secret", message: "no secret provided!" }],
         };
     }
+
     if (!options.newURL) {
       return {
         errors: [{ field: "newURL", message: "no new URL provided!" }],
       };
     }
+
     const url = await em.findOne(URL, { shorthand: options.shorthand });
+
     if (!url) {
       // url == null
       return {
@@ -170,12 +173,14 @@ export class URLResolver {
         ],
       };
     }
+
     const verified = await argon2.verify(url.secret, options.secret);
     if (!verified) {
       return {
         errors: [{ field: "secret", message: "wrong secret" }],
       };
     }
+
     const newSecret = nanoid();
     const newHashedSecret = await argon2.hash(newSecret);
     url.secret = newHashedSecret;
@@ -197,9 +202,12 @@ export class URLResolver {
   ): Promise<Boolean> {
     const url = await em.findOne(URL, { shorthand: options.shorthand });
     if (!url) return false;
+
     const valid = argon2.verify(url.secret, options.secret);
     if (!valid) return false;
+
     await em.removeAndFlush(url);
+
     return true;
   }
 }

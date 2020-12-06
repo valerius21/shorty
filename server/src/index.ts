@@ -7,6 +7,7 @@ import { __hostname__, __port__ } from "./constants";
 import microConfig from "./mikro-orm.config";
 import { HelloResolver } from "./resolvers/hello";
 import { URLResolver } from "./resolvers/url";
+import cors from "cors";
 
 /**
  * Main entry
@@ -20,6 +21,12 @@ const main = async () => {
 
   const app = express();
 
+  app.use(
+    cors({
+      origin: true,
+    })
+  );
+
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
       resolvers: [HelloResolver, URLResolver],
@@ -28,7 +35,7 @@ const main = async () => {
     context: () => ({ em: orm.em }),
   });
 
-  apolloServer.applyMiddleware({ app });
+  apolloServer.applyMiddleware({ app, cors: false });
 
   app.get("/", (_, res) => {
     res.send("hello");
