@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
-import { __idLength__ as __idSize__ } from "src/constants";
-import { ShortyContext } from "src/types";
-import { URL } from "src/entities/URL";
+import { __idLength__ as __idSize__ } from "../constants";
+import { ShortyContext } from "../types";
+import { URL } from "../entities/URL";
+import argon2 from "argon2";
 import {
   Arg,
   Ctx,
@@ -16,7 +17,7 @@ import {
 class URLInput {
   @Field()
   url: string;
-  @Field()
+  @Field(() => String, { nullable: true })
   shorthand?: string;
 }
 
@@ -50,8 +51,9 @@ export class URLResolver {
       // TODO: Handle collisions
     }
     const secret = nanoid();
+    const hashedSecret = await argon2.hash(secret);
     const urlPair = em.create(URL, {
-      secret,
+      secret: hashedSecret,
       shorthand: options.shorthand,
       url: options.url,
     });
@@ -69,7 +71,7 @@ export class URLResolver {
           ],
         };
       }
-      console.log("messasge: ", err.message);
+      console.log("message: ", err.message);
     }
     return {
       url: urlPair,
