@@ -10,6 +10,7 @@ import {
   InputType,
   Mutation,
   ObjectType,
+  Query,
   Resolver,
 } from "type-graphql";
 
@@ -19,6 +20,16 @@ class URLInput {
   url: string;
   @Field(() => String, { nullable: true })
   shorthand?: string;
+}
+
+@InputType()
+class URLUpdate {
+  @Field()
+  shorthand: string;
+  @Field()
+  newURL: string;
+  @Field()
+  secret: string;
 }
 
 @ObjectType()
@@ -39,6 +50,14 @@ class URLResponse {
   secret?: string;
 }
 
+@ObjectType()
+class URLRead {
+  @Field(() => [FieldError], { nullable: true })
+  errors?: FieldError[];
+  @Field(() => String, { nullable: true })
+  targetURL?: string;
+}
+
 @Resolver()
 export class URLResolver {
   @Mutation(() => URLResponse)
@@ -47,8 +66,9 @@ export class URLResolver {
     @Ctx() { em }: ShortyContext
   ): Promise<URLResponse> {
     if (!options.shorthand) {
-      options.shorthand = nanoid(__idSize__);
-      // TODO: Handle collisions
+      do {
+        options.shorthand = nanoid(__idSize__);
+      } while (await em.findOne(URL, { shorthand: options.shorthand }));
     }
     const secret = nanoid();
     const hashedSecret = await argon2.hash(secret);
@@ -76,6 +96,80 @@ export class URLResolver {
     return {
       url: urlPair,
       secret,
+    };
+  }
+
+  @Query(() => URLRead)
+  async lookupURL(
+    @Arg("shorthand") shorthand: string,
+    @Ctx() { em }: ShortyContext
+  ): Promise<URLRead> {
+    let url: string;
+    try {
+      url = (await em.findOne(URL, { shorthand: shorthand }))!.url;
+      console.log("url:", url);
+    } catch (err) {
+      console.log(err.message);
+      if (err.message === "Cannot read property 'url' of null")
+        return {
+          errors: [{ field: "shorthand", message: "shorthand not known" }],
+        };
+      else {
+        return {
+          errors: [{ field: "shorthand", message: err.message }],
+        };
+      }
+    }
+
+    return {
+      targetURL: url,
+    };
+  }
+
+  @Mutation(() => URLResponse)
+  async updateURL(
+    @Arg("options") options: URLUpdate,
+    @Ctx() { em }: ShortyContext
+  ): Promise<URLResponse> {
+    if (!options.shorthand || !options.secret) {
+      const shrt = !options.shorthand
+        ? { field: "shorthand", message: "no shorthand provided!" }
+        : null;
+      if (shrt)
+        return {
+          errors: [shrt],
+        };
+      else
+        return {
+          errors: [{ field: "secret", message: "no secret provided!" }],
+        };
+    }
+    const url = await em.findOne(URL, { shorthand: options.shorthand });
+    if (!url) {
+      // url == null
+      return {
+        errors: [
+          { field: "shorthand", message: "could not find shorthand entry!" },
+        ],
+      };
+    }
+    const verified = await argon2.verify(url.secret, options.secret);
+    if (!verified) {
+      return {
+        errors: [{ field: "secret", message: "wrong secret" }],
+      };
+    }
+    const newSecret = nanoid();
+    const newHashedSecret = await argon2.hash(newSecret);
+    url.secret = newHashedSecret;
+    url.url = options.newURL;
+    url.updatedAt = new Date();
+
+    await em.flush();
+
+    return {
+      url,
+      secret: newSecret,
     };
   }
 }
