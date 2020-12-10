@@ -8,6 +8,7 @@ import microConfig from "./mikro-orm.config";
 import { HelloResolver } from "./resolvers/hello";
 import { URLResolver } from "./resolvers/url";
 import cors from "cors";
+import { URL } from "./entities/URL";
 
 /**
  * Main entry
@@ -37,8 +38,25 @@ const main = async () => {
 
   apolloServer.applyMiddleware({ app, cors: false });
 
-  app.get("/", (_, res) => {
-    res.send("hello");
+  app.get("/", (_, res) => res.send("set frontend here"));
+
+  app.get("/:shorthand", async (req, res) => {
+    const { shorthand } = req.params;
+
+    if (!shorthand) {
+      res.status(500).send(`No valid shorthand provided!`);
+      return;
+    }
+
+    const target = await orm.em.findOne(URL, { shorthand });
+
+    if (!target) {
+      res
+        .status(500)
+        .send(`Given shorthand "${shorthand}" could not be found!`);
+      return;
+    }
+    res.redirect(target!.url);
   });
 
   app.listen(__port__, () =>

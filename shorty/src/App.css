@@ -1,0 +1,27 @@
+* {
+  text-align: center;
+}
+h1 {
+  margin-top: 7rem;
+  text-align: center;
+  font-size: 4rem;
+}
+
+.input-container {
+  max-width: 700px;
+  margin: auto;
+  margin-top: 6rem;
+}
+
+Button {
+  margin: 0;
+  position: absolute;
+}
+
+#app {
+  align-items: center;
+}
+
+#life {
+  text-decoration: line-through;
+}
